@@ -1,79 +1,160 @@
-//
-//  WeatherView.swift
-//  wetherApp
-//
-//  Created by Aisha Suanbekova Bakytjankyzy on 11.04.2025.
-//
-
 import SwiftUI
 
 struct WeatherView: View {
     @StateObject var viewModel = WeatherViewModel()
 
     var body: some View {
-        NavigationView {
+        ZStack {
+            // Background
+            backgroundView
+
             ScrollView {
-                VStack(spacing: 20) {
-                    currentWeatherSection
-                    forecastSection
+                VStack(spacing: 30) {
+                    if case .success(let data) = viewModel.currentWeatherState {
+                        currentWeatherMain(data)
+                    } else {
+                        currentWeatherCard
+                    }
+
+                    forecastCard
                 }
                 .padding()
             }
-            .navigationTitle("Almaty Weather")
-            .toolbar {
-                Button("Refresh") {
-                    viewModel.fetchWeather(for: "Almaty")
-                }
-            }
         }
+        .ignoresSafeArea()
         .onAppear {
             viewModel.fetchWeather(for: "Almaty")
         }
-    }
-
-    @ViewBuilder
-    var currentWeatherSection: some View {
-        switch viewModel.currentWeatherState {
-        case .idle, .loading:
-            ProgressView("Loading current weather...")
-        case .success(let data):
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Now in \(data.location.name), \(data.location.country)")
-                    .font(.headline)
-                Text("🌡 \(data.current.temp_c) °C")
-                Text("☁️ Cloud: \(data.current.cloud)%")
-                Text("💨 Wind: \(data.current.wind_kph) kph")
-                AsyncImage(url: URL(string: "https:\(data.current.condition.icon)")) { image in
-                    image.resizable().frame(width: 50, height: 50)
-                } placeholder: {
-                    ProgressView()
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    viewModel.fetchWeather(for: "Almaty")
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                 }
             }
-        case .failure(let error):
-            Text("Error: \(error.localizedDescription)")
         }
     }
 
+    // MARK: - Background Gradient (static here, could be dynamic per condition)
+    var backgroundView: some View {
+        LinearGradient(
+            gradient: Gradient(colors: [Color.blue.opacity(0.8), Color.indigo]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .blur(radius: 40)
+    }
+
+    // MARK: - Main Current Weather Display
+    func currentWeatherMain(_ data: CurrentWeatherResponse) -> some View {
+        VStack(spacing: 16) {
+            Text(data.location.name)
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+
+            AsyncImage(url: URL(string: "https:\(data.current.condition.icon)")) { image in
+                image.resizable()
+                    .scaledToFit()
+                    .frame(width: 100, height: 100)
+            } placeholder: {
+                ProgressView()
+            }
+
+            Text(data.current.condition.text)
+                .font(.title3)
+                .foregroundColor(.white)
+
+            Text("\(data.current.temp_c, specifier: "%.0f")°")
+                .font(.system(size: 80, weight: .thin))
+                .foregroundColor(.white)
+
+            HStack(spacing: 30) {
+                Label("\(data.current.wind_kph, specifier: "%.0f") kph", systemImage: "wind")
+                Label("\(data.current.cloud)%", systemImage: "cloud.fill")
+            }
+            .foregroundColor(.white.opacity(0.9))
+            .font(.subheadline)
+        }
+        .padding(.top, 50)
+    }
+
+    // MARK: - Card Style Wrapper
+    func glassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding()
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(radius: 5)
+    }
+
+    // MARK: - Fallback current card
     @ViewBuilder
-    var forecastSection: some View {
+    var currentWeatherCard: some View {
+        switch viewModel.currentWeatherState {
+        case .idle, .loading:
+            glassCard {
+                ProgressView("Loading current weather…")
+            }
+
+        case .failure(let error):
+            glassCard {
+                VStack {
+                    Image(systemName: "exclamationmark.triangle")
+                    Text("Error: \(error.localizedDescription)")
+                }
+                .foregroundColor(.white)
+            }
+
+        default: EmptyView()
+        }
+    }
+
+    // MARK: - Forecast Card
+    @ViewBuilder
+    var forecastCard: some View {
         switch viewModel.forecastState {
         case .idle, .loading:
-            ProgressView("Loading 5-day forecast...")
+            glassCard {
+                ProgressView("Loading 5-day forecast…")
+            }
+
         case .success(let data):
-            VStack(alignment: .leading, spacing: 12) {
-                Text("5-Day History").font(.headline)
-                ForEach(data.forecast.forecastday, id: \.date) { day in
-                    VStack(alignment: .leading) {
-                        Text("📅 \(day.date)")
-                        Text("🔺 Max: \(day.day.maxtemp_c) °C")
-                        Text("🔻 Min: \(day.day.mintemp_c) °C")
-                        Text("⚖️ Avg: \(day.day.avgtemp_c) °C")
+            glassCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("5-Day Forecast")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    ForEach(data.forecast.forecastday, id: \.date) { day in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(day.date)
+                                .foregroundColor(.white.opacity(0.8))
+
+                            HStack {
+                                Label("\(day.day.maxtemp_c, specifier: "%.0f")°", systemImage: "thermometer.sun.fill")
+                                Spacer()
+                                Label("\(day.day.mintemp_c, specifier: "%.0f")°", systemImage: "thermometer.snowflake")
+                            }
+                            .foregroundColor(.white)
+                        }
+                        Divider().background(.white.opacity(0.2))
                     }
-                    .padding(.vertical, 6)
                 }
             }
+
         case .failure(let error):
-            Text("Error: \(error.localizedDescription)")
+            glassCard {
+                VStack {
+                    Image(systemName: "exclamationmark.triangle")
+                    Text("Error: \(error.localizedDescription)")
+                }
+                .foregroundColor(.white)
+            }
         }
     }
 }

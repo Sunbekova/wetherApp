@@ -21,6 +21,7 @@ struct CurrentWeather: Decodable {
 }
 
 struct Condition: Decodable {
+    let text: String
     let icon: String
 }
 
