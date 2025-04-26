@@ -18,7 +18,7 @@ Uses `https://api.weatherapi.com/v1` for all weather data (requires free API key
 ---
 
 ## Preview
-
+![weatherApp](https://github.com/user-attachments/assets/a83d6365-7c7d-4050-a1f5-9b6cf922b9c5)
 
 ---
 
